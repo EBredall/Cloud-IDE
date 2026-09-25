@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Python Collaborative Editor</title>
+    <!-- Load the Socket.IO library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <!-- Quill CSS -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <!-- Quill JS -->
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <!-- Quill Cursors JS -->
+    <script src="https://cdn.jsdelivr.net/npm/quill-cursors@3.1.0/dist/quill-cursors.min.js"></script>
+</head>
+<body>
+    <div id="editor"></div>
+    <h1>Our Python Docs</h1>
+
+    <script>
+        const socket = io();
+
+        // Generate a random ID and color for this user session
+        const myId = Math.random().toString(36).substring(2, 9);
+        const myColor = '#' + Math.floor(Math.random()*16777215).toString(16);
+
+        // Initialize Quill and the Cursors module
+        Quill.register('modules/cursors', QuillCursors);
+        const quill = new Quill('#editor', {
+            theme: 'snow',
+            modules: { cursors: true }
+        });
+        const cursors = quill.getModule('cursors');
+
+        // 1. SEND CURSOR MOVES: Triggered when you click or use arrow keys
+        quill.on('selection-change', function(range) {
+            if (range) {
+                   socket.emit('cursor_move', {
+                    id: myId,
+                    name: 'Partner',
+                   color: myColor,
+                    range: range // Contains the index where your cursor is
+                });
+            }
+        });
+
+        // 2. RECEIVE CURSOR MOVES: Draw your partner's cursor
+        socket.on('cursor_move', function(data) {
+            // Create the cursor if it doesn't exist yet
+            cursors.createCursor(data.id, data.name, data.color);
+            // Move it to the correct position
+            cursors.moveCursor(data.id, data.range);
+        });
+
+        // 3. SEND/RECEIVE TEXT: (Updated for Quill)
+        quill.on('text-change', function(delta, oldDelta, source) {
+            if (source === 'user') {
+                socket.emit('text_update', { content: quill.getContents() });
+            }
+        });
+
+        socket.on('text_update', function(data) {
+            quill.setContents(data.content);
+        });
+    </script>
+</body>
+</html>
